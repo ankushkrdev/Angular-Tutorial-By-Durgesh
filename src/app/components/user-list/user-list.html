@@ -1,0 +1,33 @@
+<div class="container-fluid">
+  <div class="p-3">
+   
+
+    <div *ngFor="let user of userList" class="mb-3">
+      <div
+        class="d-flex align-items-center p-3  rounded shadow-sm user-card"
+        style="cursor: pointer"
+        (click)="startChatChild(user.uid)"
+      >
+        <!-- Profile Image -->
+        <img
+          [src]="user.imageURL"
+          [alt]="user.name"
+          class="rounded-circle me-3"
+          style="width: 50px; height: 50px; object-fit: cover"
+          (error)="handleImageError($event, user)"
+        />
+
+        <!-- User Info -->
+        <div class="flex-grow-1">
+          <h6 class="mb-0 fw-bold">{{ user.name }}</h6>
+          <small class="text-muted">{{ user.email }}</small>
+        </div>
+
+        <!-- Start Chat Button -->
+        <button class="btn btn-primary btn-sm ">
+          <i class="bi bi-chat-dots me-1"></i>Start Chat
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

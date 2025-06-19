@@ -1,0 +1,23 @@
+.chat-header {
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+}
+
+.user-initials {
+  font-size: 0.75rem; /* Adjust size to fit */
+  text-align: center;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.text-color {
+  background-color: rgb(99, 148, 19);
+}
+.messages {
+  scroll-behavior: smooth;
+  overflow-y: scroll;
+ 
+}
+

@@ -1,0 +1,203 @@
+<!-- Top Navbar with Current User Info -->
+<nav class="navbar navbar-light bg-black border-bottom px-3">
+  <div class="ms-auto dropdown">
+    <button
+      class="btn btn-outline-secondary text-white border-2 dropdown-toggle"
+      type="button"
+      data-bs-toggle="dropdown"
+      aria-expanded="false"
+    >
+      {{ currentUser?.displayName || 'User' }}
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><span class="dropdown-item-text">{{ currentUser?.email }}</span></li>
+      <li><hr class="dropdown-divider" /></li>
+      <li>
+        <button
+          class="dropdown-item text-danger"
+          (click)="authService.signOutUser()"
+        >
+          <i class="bi bi-box-arrow-right me-2"></i>Logout
+        </button>
+      </li>
+      <li *ngIf="!currentUser?.emailVerified">
+        <button class="dropdown-item text-warning">
+          <i class="bi bi-envelope-exclamation me-2"></i>Verify Email
+        </button>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Main Chat Interface -->
+<div *ngIf="authService.loggedInStatus && (currentUser || toUser)">
+  <div class="container-fluid py-3">
+    <div class="row h-100">
+      <!-- User List Column -->
+      <div class="col-md-4 border-end bg-transparent">
+        <div class="p-3">
+          <h6 class="text-muted mb-3">CONTACTS</h6>
+          <app-user-list
+            (startEventEmitter)="startChatParent($event)"
+          ></app-user-list>
+        </div>
+      </div>
+
+      <!-- Chat Area Column -->
+      <div
+        class="col-md-8 d-flex flex-column"
+        *ngIf="toUser"
+        style="height: calc(100vh - 70px)"
+      >
+        <!-- Chat Header -->
+        <div class="chat-header bg-white border-bottom p-3 shadow-sm">
+          <div class="d-flex align-items-center">
+            <div
+              class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3 overflow-hidden"
+              style="width: 45px; height: 45px"
+            >
+              <span class="text-white fw-bold user-initials"
+                >{{ toUser.displayName }}</span
+              >
+            </div>
+
+            <div>
+              <h5 class="mb-0">{{ toUser.displayName }}</h5>
+              <small class="text-muted">
+                <i
+                  class="bi bi-circle-fill text-success me-1"
+                  style="font-size: 8px"
+                ></i
+                >Online
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages Container -->
+        <div
+          #messageBox
+          class="messages flex-grow-1 overflow-auto p-2"
+          style="background : transparent"
+        >
+          <div *ngFor="let chat of chats; let last = last" class="mb-3">
+            <!-- Message from other user -->
+            <div
+              *ngIf="chat.from !== currentUser?.uid"
+              class="d-flex align-items-start messagesFormat"
+            >
+              <div
+                class="bg-success rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                style="width: 32px; height: 32px"
+              >
+                <span class="text-white fw-bold" style="font-size: 12px"
+                  >{{ toUser.displayName }}</span
+                >
+              </div>
+              <div class="flex-grow-1 d-flex justify-content-start">
+                <div
+                  class="bg-white  rounded-3 p-3 shadow-sm"
+                  style="max-width: 65%"
+                >
+                  <p class="mb-1">{{ chat.message }}</p>
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <!-- <small class="text-muted">{{ toUser.displayName }}</small> -->
+                    <small class="text-muted"
+                      >{{ formatTime(chat.timestamp!) }}</small
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Message from current user -->
+            <div
+              *ngIf="chat.from === currentUser?.uid"
+              class="d-flex align-items-start justify-content-end messagesFormat"
+            >
+              <div class="flex-grow-1 d-flex justify-content-end">
+                <div
+                  class=" text-color rounded-3 p-3 shadow-sm text-white"
+                  style="max-width: 75% ;"
+                >
+                  <p class="mb-1">{{ chat.message }}</p>
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <!-- <small class="opacity-75">You </small> -->
+                    <small class="opacity-75"
+                      >{{ formatTime(chat.timestamp!) }}</small
+                    >
+                  </div>
+                </div>
+              </div>
+              <div
+                class="text-color rounded-circle d-flex align-items-center justify-content-center ms-2 flex-shrink-0"
+                style="width: 35px; height: 35px"
+              >
+                <span class="text-white fw-bold" style="font-size: 12px"
+                  >{{ currentUser?.displayName }}</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Message Input -->
+        <div class="bg-white border-top p-3 mb-2 rounded-3">
+          <form (ngSubmit)="sendMessage($event)" class="d-flex gap-2">
+            <input
+              type="text"
+              class="form-control border-0 bg-light rounded-pill px-4 py-2"
+              [(ngModel)]="message"
+              name="message"
+              placeholder="Type your message..."
+            />
+            <button
+              type="submit"
+              class="btn btn-primary  d-flex align-items-center justify-content-center"
+              style="width: 60px; height: 40px"
+              [disabled]="!message.trim()"
+            >
+              <i class="bi bi-send-fill">Send</i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- No Chat Selected -->
+      <div
+        class="col-md-8 d-flex align-items-center justify-content-center"
+        *ngIf="!toUser"
+      >
+        <div class="text-center ">
+          <i class="bi bi-chat-dots" style="font-size: 4rem; opacity: 0.5"></i>
+          <h4 class="mt-3">Select a conversation</h4>
+          <p>Choose someone from your contacts to start messaging</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fallback for not logged in -->
+<div
+  *ngIf="!authService.loggedInStatus || (!currentUser && !toUser)"
+  class="d-flex align-items-center justify-content-center min-vh-100 bg-light"
+>
+  <div class="text-center">
+    <div class="mb-4">
+      <i
+        class="bi bi-chat-square-text text-primary"
+        style="font-size: 4rem"
+      ></i>
+    </div>
+    <h3 class="mb-3">Welcome to Chat App</h3>
+    <p class="text-muted mb-4">Please log in to access your conversations</p>
+    <a routerLink="/login" class="btn btn-primary btn-lg px-5">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Login to Continue
+    </a>
+  </div>
+</div>
