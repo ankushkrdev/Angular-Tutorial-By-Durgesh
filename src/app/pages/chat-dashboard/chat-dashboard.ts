@@ -13,7 +13,7 @@ import {
   Auth,
   onAuthStateChanged,
   User as FirebaseUser,
-
+  updateProfile,
 } from '@angular/fire/auth';
 import { Database, onValue, push, ref, set, off } from '@angular/fire/database';
 import { ToastrService } from 'ngx-toastr';
@@ -33,7 +33,7 @@ import { Message } from '../../models/message';
 })
 export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('messageBox', { static: false }) messageBox!: ElementRef;
-  
+
   currentUser: FirebaseUser | null = null;
   toUser: User | null = null;
   message: string = '';
@@ -44,7 +44,7 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
   private chatRef: any = null;
   private shouldScrollToBottom = false;
   private isInitialLoad = true;
-  private messageDrafts = new Map<string, string>(); //Here <string,string> is key and value
+  private messageDrafts = new Map<string, string>();
 
   constructor(
     public authService: AuthService,
@@ -84,24 +84,21 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
       off(this.chatRef);
       this.chatRef = null;
     }
-    
-    // Clear message input and chat state when cleaning up
-  
+
+    // Note: We don't clear message here anymore since we're using drafts
+    // The draft system will handle message state
     this.chats = [];
   }
 
   startChatParent(uid: string) {
-    
-  // Save current draft before switching
-  if (this.toUser && this.message.trim()) {
-    this.messageDrafts.set(this.toUser.uid, this.message);
-  }
+    // Save current draft before switching
+    if (this.toUser && this.message.trim()) {
+      this.messageDrafts.set(this.toUser.uid, this.message);
+    }
+
     // Clean up previous chat subscription
     this.cleanupChatSubscription();
-    
-    // Clear the message input when switching chats
-    
-    
+
     // Reset chat state
     this.chats = [];
     this.chatRefNode = `chats/${this.currentUser!.uid}****${uid}`;
@@ -112,8 +109,10 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
       next: (user) => {
         this.toUser = user;
         console.log('Chat partner:', this.toUser);
-         // Load draft for new chat
-         this.message = this.messageDrafts.get(uid) || '';
+
+        // Load draft for new chat
+        this.message = this.messageDrafts.get(uid) || '';
+
         this.loadChat();
       },
       error: (err) => {
@@ -121,7 +120,6 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
         this.toastr.error('Error in starting chat');
       },
     });
-    
   }
 
   loadChat() {
@@ -143,9 +141,9 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
             const newMessages = this.processMessagesData(data);
             this.handleNewMessages(newMessages);
           } else {
-            // Try opposite chat reference
-            console.log('No data in primary chat, trying opposite chat:', this.oppChatRefNode);
-            this.loadOppositeChat();
+            this.chats = [];
+            this.isInitialLoad = false;
+            console.log('No messages found in chat');
           }
         });
       },
@@ -187,16 +185,17 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
   private handleNewMessages(newMessages: Message[]) {
     const previousLength = this.chats.length;
     const wasAtBottom = this.isScrolledToBottom();
-    
+
     // Check if we have new messages
     const hasNewMessages = newMessages.length > previousLength;
-    
+
     // Update the messages array
     this.chats = newMessages;
-    
+
     // Determine if we should scroll to bottom
-    this.shouldScrollToBottom = this.isInitialLoad || wasAtBottom || hasNewMessages;
-    
+    this.shouldScrollToBottom =
+      this.isInitialLoad || wasAtBottom || hasNewMessages;
+
     if (this.isInitialLoad) {
       this.isInitialLoad = false;
     }
@@ -207,7 +206,7 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
       if (this.shouldScrollToBottom) {
         this.scrollToBottom();
       }
-    }, 100);
+    }, 0);
 
     console.log('Processed messages:', this.chats);
   }
@@ -231,7 +230,9 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
     // Sort messages by timestamp
     messages.sort((a, b) => {
       if (a.timestamp && b.timestamp) {
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        return (
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
       }
       return 0;
     });
@@ -260,14 +261,16 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
       date: new Date().toString(),
       timestamp: new Date().toString(),
     } as Message;
-
-    const senderRef = ref(this.fireDb, this.chatRefNode);
+const senderRef = ref(this.fireDb, this.chatRefNode);
     const receiverRef = ref(this.fireDb, this.oppChatRefNode);
+    // Only write to one chat reference since both users share the same reference
+    const chatRef = ref(this.fireDb, this.chatRefNode);
 
     console.log('Sending to references:', {
       senderRef: this.chatRefNode,
       receiverRef: this.oppChatRefNode,
     });
+
 
     // Set flag to scroll to bottom after sending
     this.shouldScrollToBottom = true;
@@ -280,6 +283,12 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
         console.log('Message sent successfully');
         this.toastr.success('Message sent');
         this.message = '';
+
+        // Clear the draft for this user since message was sent
+        if (this.toUser) {
+          this.messageDrafts.delete(this.toUser.uid);
+        }
+
         // The Firebase listener will automatically update the UI
       })
       .catch((err) => {
@@ -290,16 +299,19 @@ export class ChatDashboard implements OnInit, OnDestroy, AfterViewInit {
 
   private isScrolledToBottom(): boolean {
     if (!this.messageBox?.nativeElement) return true;
-    
+
     const element = this.messageBox.nativeElement;
     const threshold = 50; // 50px threshold for "near bottom"
-    
-    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+
+    return (
+      element.scrollTop + element.clientHeight >=
+      element.scrollHeight - threshold
+    );
   }
 
   private scrollToBottom(): void {
     if (!this.messageBox?.nativeElement) return;
-    
+
     try {
       const element = this.messageBox.nativeElement;
       element.scrollTop = element.scrollHeight;
